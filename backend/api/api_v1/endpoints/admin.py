@@ -1,10 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 
+from backend.models.user import User, UserRole
+from backend.api.api_v1.endpoints.health_records import get_current_active_user
+
 router = APIRouter()
 
+# Dependency for getting admin user
+async def get_current_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
+    """
+    Check if current user is admin
+    """
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+    return current_user
+
 @router.get("/dashboard")
-async def admin_dashboard():
+async def admin_dashboard(current_user: User = Depends(get_current_admin_user)):
     """
     Admin dashboard statistics
     """
@@ -20,7 +35,7 @@ async def admin_dashboard():
     }
 
 @router.get("/users")
-async def admin_users():
+async def admin_users(current_user: User = Depends(get_current_admin_user)):
     """
     Admin user management
     """
@@ -31,7 +46,7 @@ async def admin_users():
     ]
 
 @router.put("/users/{user_id}/activate")
-async def activate_user(user_id: int):
+async def activate_user(user_id: int, current_user: User = Depends(get_current_admin_user)):
     """
     Activate a user
     """
@@ -39,7 +54,7 @@ async def activate_user(user_id: int):
     return {"id": user_id, "status": "activated"}
 
 @router.put("/users/{user_id}/deactivate")
-async def deactivate_user(user_id: int):
+async def deactivate_user(user_id: int, current_user: User = Depends(get_current_admin_user)):
     """
     Deactivate a user
     """

@@ -48,11 +48,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const data = await authService.login(email, password);
       
-      // Save auth token and user data
+      // Save auth token 
       localStorage.setItem('token', data.access_token);
-      localStorage.setItem('user', JSON.stringify(data.user));
       
-      setUser(data.user);
+      // Handle user data from response
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
+      } else {
+        // Fallback if user data not included in response
+        // Try to fetch user data separately
+        try {
+          const userData = await authService.getCurrentUser();
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+        } catch (userError) {
+          console.error('Error fetching user data:', userError);
+        }
+      }
+      
       setIsAuthenticated(true);
       
       return data.user;

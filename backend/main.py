@@ -5,6 +5,10 @@ from fastapi.openapi.utils import get_openapi
 
 from backend.core.config import settings
 from backend.api.api_v1.api import api_router
+from backend.db.database import Base, engine
+
+# Create tables if they don't exist
+Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app
 app = FastAPI(
@@ -17,7 +21,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS if origin],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,4 +49,4 @@ async def root():
 # For development server
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True) 

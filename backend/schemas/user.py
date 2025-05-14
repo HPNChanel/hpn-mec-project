@@ -7,16 +7,29 @@ class UserRole(str, Enum):
     USER = "user"
     ADMIN = "admin"
 
+class UserInfo(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    role: UserRole
+
 # Token schema for authentication response
 class Token(BaseModel):
     access_token: str
     token_type: str
+    user: Optional[UserInfo] = None
 
     class Config:
         json_schema_extra = {
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                "token_type": "bearer"
+                "token_type": "bearer",
+                "user": {
+                    "id": 1,
+                    "name": "John Doe",
+                    "email": "john.doe@example.com",
+                    "role": "user"
+                }
             }
         }
 

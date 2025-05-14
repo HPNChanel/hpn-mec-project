@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
-from typing import List, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Header
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
 
@@ -7,26 +7,32 @@ from backend.db.session import get_db
 from backend.models.user import User, UserRole
 from backend.models.health_record import HealthRecord
 from backend.schemas.health_record import HealthRecordCreate, HealthRecordResponse, HealthRecordUpdate
-from backend.services.auth import get_current_user
+from backend.services.auth import get_user_from_token
 
 router = APIRouter()
 
 # Dependency for getting the current user
-async def get_current_active_user(db: Session = Depends(get_db)) -> User:
+async def get_current_active_user(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> User:
     """
-    Get the current authenticated user.
+    Get the current authenticated user from JWT token.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    NOTE: This is a placeholder implementation. In a real app, you would
-    extract the user ID from a JWT token or session.
-    """
-    # Placeholder - in a real app, get the user ID from token
-    user_id = 1
-    user = get_current_user(db, user_id)
+    token = authorization.split(" ")[1]
+    user = get_user_from_token(db, token)
     
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
+            detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
     

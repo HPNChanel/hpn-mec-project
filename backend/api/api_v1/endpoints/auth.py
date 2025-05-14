@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from backend.db.session import get_db
 from backend.models.user import User, UserRole
 from backend.schemas.user import UserCreate, UserResponse, UserLogin, Token
-from backend.services.auth import create_user, authenticate_user, get_current_user
+from backend.services.auth import create_user, authenticate_user, get_current_user, get_user_from_token
 from backend.utils.security import create_access_token
 
 router = APIRouter()
@@ -34,8 +35,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """
     Authenticate a user and return a JWT token.
@@ -52,9 +52,16 @@ async def login(
     # Generate JWT token
     access_token = create_access_token(subject=user.id)
     
+    # Return both token and user data
     return {
         "access_token": access_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role
+        }
     }
 
 @router.post("/login-json", response_model=Token)
@@ -76,37 +83,83 @@ async def login_json(
     # Generate JWT token
     access_token = create_access_token(subject=user.id)
     
+    # Return both token and user data
     return {
         "access_token": access_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role
+        }
     }
 
 @router.get("/me", response_model=UserResponse)
-async def read_users_me(request: Request, db: Session = Depends(get_db)):
+async def read_users_me(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
     """
-    Get current user information based on token/session
+    Get current user information based on token
     """
-    # In a real implementation, you would get the user from token or session
-    # For now, we'll use a placeholder implementation that returns a fake user
-    # Future: Replace with actual JWT token validation
-    
-    # This is a placeholder - in a real app, you would extract a user ID from
-    # the session or decoded JWT token and fetch the actual user
-    current_user = get_current_user(db, user_id=1)
-    
-    if not current_user:
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    token = authorization.split(" ")[1]
+    current_user = get_user_from_token(db, token=token)
+    
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     return current_user
 
-@router.post("/refresh-token")
-async def refresh_token():
+@router.post("/refresh-token", response_model=Token)
+async def refresh_token(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
     """
     Refresh access token
     """
-    # This is a placeholder - will be implemented with token refresh logic
-    return {"access_token": "new_placeholder_token", "token_type": "bearer"} 
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Extract the token from header
+    token = authorization.split(" ")[1]
+    
+    # Validate current token and get user
+    current_user = get_user_from_token(db, token=token)
+    
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Generate new token
+    new_token = create_access_token(subject=current_user.id)
+    
+    return {
+        "access_token": new_token,
+        "token_type": "bearer",
+        "user": {
+            "id": current_user.id,
+            "name": current_user.name,
+            "email": current_user.email,
+            "role": current_user.role
+        }
+    } 

@@ -29,12 +29,53 @@ pip install -r requirements.txt
 uvicorn backend.main:app --reload
 ```
 
-## Database Migration
+## Database Setup and Migration
+
+The application automatically creates tables on first run. For schema changes, use the migration system:
 
 ```bash
-# Run database migrations
-cd backend
-python -m migrations.run_migrations
+# Show migration status
+python -m backend.migrate status
+
+# Apply all pending migrations
+python -m backend.migrate up
+
+# Rollback the latest migration
+python -m backend.migrate down
+
+# Show help
+python -m backend.migrate help
+```
+
+### Creating New Migrations
+
+1. Create a new file in the `migrations` directory with a numeric prefix (e.g., `003_add_new_table.py`)
+2. Follow the structure of existing migration files with `upgrade()` and `downgrade()` functions
+3. Run `python -m backend.migrate up` to apply the new migration
+
+Example migration file:
+```python
+"""
+Migration description
+"""
+from sqlalchemy import text
+
+# Migration metadata
+migration_id = "003"  # must be unique and sequential
+migration_name = "add_new_column"
+description = "Add a new column to existing table"
+
+def upgrade(engine):
+    """Apply migration"""
+    with engine.connect() as connection:
+        connection.execute(text("ALTER TABLE table_name ADD COLUMN new_column VARCHAR(255)"))
+    print(f"Applied {migration_id}_{migration_name}: {description}")
+
+def downgrade(engine):
+    """Rollback migration"""
+    with engine.connect() as connection:
+        connection.execute(text("ALTER TABLE table_name DROP COLUMN new_column"))
+    print(f"Rolled back {migration_id}_{migration_name}: {description}")
 ```
 
 ## API Documentation
@@ -56,6 +97,7 @@ Once the server is running, API documentation is available at:
 - `services/`: Business logic and service layer
 - `utils/`: Utility functions
 - `migrations/`: Database migration scripts
+- `migrate.py`: Migration runner utility
 
 ## Recent Updates
 
@@ -63,5 +105,5 @@ Once the server is running, API documentation is available at:
 - Added analytics endpoint with real-time database queries
 - Implemented export/import functionality for health records
 - Added user management endpoints for administrators
-- Created database migration scripts
+- Created lightweight database migration system
 - Improved error handling and authentication 

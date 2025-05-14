@@ -2,9 +2,11 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import Optional
+from jose import jwt, JWTError
 
 from backend.models.user import User
 from backend.schemas.user import UserCreate
+from backend.core.config import settings
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -53,13 +55,41 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     
     return user
 
-def get_current_user(db: Session, user_id: int) -> Optional[User]:
+def get_user_from_token(db: Session, token: str) -> Optional[User]:
     """
-    Get user by ID
+    Validate JWT token and extract user_id
     """
-    # In a real app with JWT, this would validate the token
-    # and extract the user_id from it
-    return db.query(User).filter(User.id == user_id).first()
+    try:
+        # Decode the JWT token
+        payload = jwt.decode(
+            token, 
+            settings.SECRET_KEY, 
+            algorithms=["HS256"]
+        )
+        
+        # Extract the user_id from the 'sub' claim
+        user_id = int(payload.get("sub"))
+        
+        # Get the user from database
+        return db.query(User).filter(User.id == user_id).first()
+    except JWTError:
+        # Invalid token
+        return None
+    except (ValueError, TypeError):
+        # Invalid user_id in token
+        return None
+
+def get_current_user(db: Session, user_id: Optional[int] = None, token: Optional[str] = None) -> Optional[User]:
+    """
+    Get user by ID or from token
+    """
+    if token:
+        # Extract user from token
+        return get_user_from_token(db, token)
+    elif user_id:
+        # Get user by ID directly
+        return db.query(User).filter(User.id == user_id).first()
+    return None
 
 # These functions would be expanded for JWT token handling in the future
 # For example:
